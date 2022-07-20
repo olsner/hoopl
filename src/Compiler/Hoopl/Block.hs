@@ -41,6 +41,7 @@ module Compiler.Hoopl.Block (
 
   ) where
 
+import Data.Kind (Type)
 
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed
@@ -57,7 +58,7 @@ data O
 data C
 
 -- | Either type indexed by closed/open using type families
-type family IndexedCO ex a b :: *
+type family IndexedCO ex a b :: Type
 type instance IndexedCO C a _b = a
 type instance IndexedCO O _a b = b
 
