@@ -147,10 +147,10 @@ class Uniques u where
   withFresh :: (u -> AGraph n e x) -> AGraph n e x
 
 instance Uniques Unique where
-  withFresh f = A $ freshUnique >>= (graphOfAGraph . f)
+  withFresh f = A $ freshUnique >>= (\x -> graphOfAGraph (f x))
 
 instance Uniques Label where
-  withFresh f = A $ freshUnique >>= (graphOfAGraph . f . uniqueToLbl)
+  withFresh f = A $ freshUnique >>= (\x -> graphOfAGraph (f . uniqueToLbl $ x))
 
 -- | Lifts binary 'Graph' functions into 'AGraph' functions.
 liftA2 :: (Graph  n a b -> Graph  n c d -> Graph  n e f)
