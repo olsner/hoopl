@@ -547,7 +547,13 @@ class Monad m => FixpointMonad m where
   observeChangedFactBase :: m (Maybe (FactBase f)) -> Maybe (FactBase f)
 -}
 
-data Direction = Fwd | Bwd
+data Direction = Fwd | Bwd deriving (Show,Ord,Eq)
+
+setPopMin :: IsSet s => s -> Maybe (ElemOf s, s)
+setPopMin s
+  | setNull s = Nothing
+  | otherwise = Just (min, setDelete min s) where min = head (setElems s)
+
 fixpoint :: forall m n f. (CheckpointMonad m, NonLocal n)
  => Direction
  -> DataflowLattice f
@@ -558,9 +564,9 @@ fixpoint :: forall m n f. (CheckpointMonad m, NonLocal n)
 
 fixpoint direction lat do_block entries blockmap init_fbase
   = do
-        -- trace ("fixpoint: " ++ show (case direction of Fwd -> True; Bwd -> False) ++ " " ++ show (mapKeys blockmap) ++ show entries ++ " " ++ show (mapKeys init_fbase)) $ return()
-        (fbase, newblocks) <- loop init_fbase entries mapEmpty
-        -- trace ("fixpoint DONE: " ++ show (mapKeys fbase) ++ show (mapKeys newblocks)) $ return()
+        -- trace ("fixpoint: " ++ show direction ++ " " ++ show (mapKeys blockmap) ++ show (length entries) ++ " " ++ show (length (mapKeys init_fbase))) $ return()
+        (fbase, newblocks) <- loop init_fbase mapEmpty (setFromList entries)
+        -- trace ("fixpoint DONE: " ++ show (length (mapKeys fbase)) ++ show (mapKeys newblocks)) $ return()
         return (GMany NothingO newblocks NothingO,
                 mapDeleteList (mapKeys blockmap) fbase)
     -- The successors of the Graph are the the Labels
@@ -579,16 +585,16 @@ fixpoint direction lat do_block entries blockmap init_fbase
 
     loop
        :: FactBase f  -- current factbase (increases monotonically)
-       -> [Label]     -- blocks still to analyse (Todo: use a better rep)
        -> LabelMap (DBlock f n C C)  -- transformed graph
+       -> LabelSet     -- blocks still to analyse
        -> m (FactBase f, LabelMap (DBlock f n C C))
 
-    loop fbase []         newblocks = return (fbase, newblocks)
-    loop fbase (lbl:todo) newblocks = do
-      case mapLookup lbl blockmap of
-         Nothing  -> loop fbase todo newblocks
+    loop fbase newblocks q = case setPopMin q of
+     Nothing -> return (fbase, newblocks)
+     Just (lbl,todo) -> case mapLookup lbl blockmap of
+         Nothing  -> loop fbase newblocks todo
          Just blk -> do
-           -- trace ("analysing: " ++ show lbl) $ return ()
+           -- trace ("analysing: " ++ show lbl ++ " TODO:" ++ show (setSize todo)) $ return ()
            (rg, out_facts) <- do_block blk fbase
            let (changed, fbase') = mapFoldWithKey
                                      (updateFact lat newblocks)
@@ -596,16 +602,15 @@ fixpoint direction lat do_block entries blockmap init_fbase
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
      
-           let to_analyse
-                 = filter (`notElem` todo) $
+           let to_analyse = setFromList $
                    concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
 
-           -- trace ("to analyse: " ++ show to_analyse) $ return ()
+           -- trace ("to analyse: " ++ show (to_analyse `setDifference` todo)) $ return ()
 
            let newblocks' = case rg of
                               GMany _ blks _ -> mapUnion blks newblocks
      
-           loop fbase' (todo ++ to_analyse) newblocks'
+           loop fbase' newblocks' (setUnion todo to_analyse)
 
 
 {-  Note [TxFactBase invariants]
