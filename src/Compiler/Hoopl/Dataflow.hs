@@ -574,9 +574,9 @@ fixpoint direction lat do_block entries blockmap init_fbase
     -- the blocks of the graph
   where
     -- mapping from L -> Ls.  If the fact for L changes, re-analyse Ls.
-    dep_blocks :: LabelMap [Label]
-    dep_blocks = mapFromListWith (++)
-                        [ (l, [entryLabel b])
+    dep_blocks :: LabelMap LabelSet
+    dep_blocks = mapFromListWith setUnion
+                        [ (l, setSingleton (entryLabel b))
                         | b <- mapElems blockmap
                         , l <- case direction of
                                  Fwd -> [entryLabel b]
@@ -602,8 +602,8 @@ fixpoint direction lat do_block entries blockmap init_fbase
            -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
            -- trace ("changed: " ++ show changed) $ return ()
      
-           let to_analyse = setFromList $
-                   concatMap (\l -> mapFindWithDefault [] l dep_blocks) changed
+           let to_analyse = setUnions $
+                   map (\l -> mapFindWithDefault setEmpty l dep_blocks) changed
 
            -- trace ("to analyse: " ++ show (to_analyse `setDifference` todo)) $ return ()
 
